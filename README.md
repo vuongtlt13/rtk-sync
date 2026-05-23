@@ -22,18 +22,23 @@ Current MVP features:
 
 ## 2. Quick Start
 
-Build from source:
+Download the right binary for your OS from GitHub Releases:
+
+- macOS Apple Silicon: `rtk-sync-aarch64-apple-darwin.tar.gz`
+- macOS Intel: `rtk-sync-x86_64-apple-darwin.tar.gz`
+- Linux x86_64: `rtk-sync-x86_64-unknown-linux-gnu.tar.gz`
+- Windows x86_64: `rtk-sync-x86_64-pc-windows-msvc.zip`
+
+Install it somewhere on your `PATH`, then verify:
 
 ```bash
-git clone <repo-url>
-cd rtk-sync
-cargo build --release
+rtk-sync --version
 ```
 
 Configure your sync server:
 
 ```bash
-./target/release/rtk-sync config \
+rtk-sync config \
   --endpoint https://your-server.example.com/api/rtk/events \
   --token your-token
 ```
@@ -41,30 +46,28 @@ Configure your sync server:
 Check the local RTK tracking database:
 
 ```bash
-./target/release/rtk-sync inspect
+rtk-sync inspect
+```
+
+Test local DB reading without a server:
+
+```bash
+rtk-sync once --dry-run
 ```
 
 Run one sync batch:
 
 ```bash
-./target/release/rtk-sync once
+rtk-sync once
 ```
 
 Install auto-start service for background sync:
 
 ```bash
-./target/release/rtk-sync install-service
+rtk-sync install-service
 ```
 
-The background interval is read from `config.toml` (`interval = 60` by default).
-
-For development, use Cargo directly:
-
-```bash
-cargo run -- config --endpoint https://your-server.example.com/api/rtk/events --token your-token
-cargo run -- inspect
-cargo run -- once
-```
+The background interval is read from `config.toml` (`interval = 60` by default). See [Installation](docs/installation.md) for per-platform install commands and source-build instructions.
 
 ## 3. Configuration
 
