@@ -1,0 +1,63 @@
+use anyhow::{Context, Result};
+use clap::Parser;
+use rtk_sync::cli::{Cli, Command};
+use rtk_sync::{config, machine, rtkdb, service, state, syncer};
+
+fn main() -> Result<()> {
+    let cli = Cli::parse();
+
+    match cli.command {
+        Command::Inspect(args) => {
+            let config = config::inspect_config(args)?;
+            rtkdb::inspect(&config.db_path)?;
+        }
+        Command::MachineId(args) => {
+            let config = config::machine_config(args)?;
+            let mut state = state::State::load(&config.state_path)?;
+            let machine_id = machine::resolve_machine_id(config.machine_id.as_deref(), &mut state)?;
+            state.save(&config.state_path)?;
+            println!("{machine_id}");
+        }
+        Command::Config(args) => {
+            let path = config::write_config(args)?;
+            println!("Updated config: {}", path.display());
+        }
+        Command::Reset(args) => {
+            let state_path = config::reset_config(args)?;
+            if state_path.exists() {
+                std::fs::remove_file(&state_path).with_context(|| {
+                    format!("failed to remove state file: {}", state_path.display())
+                })?;
+                println!("rtk-sync: reset state: {}", state_path.display());
+            } else {
+                println!("rtk-sync: state already missing: {}", state_path.display());
+            }
+        }
+        Command::Once(args) => {
+            let config = config::sync_config(args)?;
+            syncer::run_once(&config)?;
+        }
+        Command::RunService(args) => {
+            let config = config::sync_config(rtk_sync::cli::SyncArgs {
+                config: args.config,
+                db: None,
+                state: None,
+                endpoint: None,
+                token_env: None,
+                machine_id: None,
+                batch_size: None,
+                allow_insecure_http: false,
+                dry_run: false,
+            })?;
+            syncer::run_daemon(config.clone(), config.interval)?;
+        }
+        Command::InstallService(args) => {
+            service::install(args)?;
+        }
+        Command::UninstallService(args) => {
+            service::uninstall(args)?;
+        }
+    }
+
+    Ok(())
+}

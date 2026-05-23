@@ -1,0 +1,32 @@
+# rtk-sync config
+# Default location is OS-specific:
+#   macOS: ~/Library/Application Support/rtk-sync/config.toml
+#   Linux: ~/.config/rtk-sync/config.toml
+#   Windows: %APPDATA%\rtk-sync\config.toml
+#
+# rtk-sync auto-creates this file at the default location on first run.
+# Environment variables override this file; CLI flags override both.
+
+# Optional RTK tracking database path override.
+# Leave commented to auto-detect the same OS-specific default as RTK:
+# dirs::data_local_dir()/rtk/history.db
+# db = "/path/to/rtk/history.db"
+
+# Optional rtk-sync state file override.
+# Leave commented to use dirs::data_local_dir()/rtk-sync/state.json
+# state = "/path/to/rtk-sync/state.json"
+
+endpoint = "https://example.com/api/rtk/events"
+
+# Prefer token_env when you do not want the token stored in config.toml.
+token_env = "RTK_SYNC_TOKEN"
+
+# Or store the token directly by running: rtk-sync config --token <token>
+# token = "replace-me"
+
+# Optional stable machine ID override. If unset, rtk-sync derives one from local machine info and stores it in state.
+# machine_id = "macbook-vuong"
+
+batch_size = 100
+interval = 60
+allow_insecure_http = false
