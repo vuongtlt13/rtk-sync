@@ -6,3 +6,4 @@ pub mod rtkdb;
 pub mod service;
 pub mod state;
 pub mod syncer;
+pub mod update;

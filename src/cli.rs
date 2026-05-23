@@ -22,6 +22,8 @@ pub enum Command {
     Once(SyncArgs),
     /// Show config, state, checkpoint, and pending event count.
     Status(StatusArgs),
+    /// Download and install the latest rtk-sync release.
+    Update(UpdateArgs),
     #[command(hide = true)]
     RunService(ServiceRunArgs),
     /// Install the background sync service.
@@ -133,6 +135,29 @@ pub struct SyncArgs {
 
     #[arg(long, default_value_t = false)]
     pub dry_run: bool,
+}
+
+#[derive(Debug, Parser)]
+pub struct UpdateArgs {
+    #[arg(long, env = "RTK_SYNC_REPO", default_value = "vuongtlt13/rtk-sync")]
+    pub repo: String,
+
+    #[arg(
+        long,
+        env = "RTK_SYNC_INSTALL_DIR",
+        default_value = "/opt/homebrew/bin"
+    )]
+    pub install_dir: PathBuf,
+
+    #[arg(
+        long,
+        env = "RTK_SYNC_SERVICE_LABEL",
+        default_value = "com.vuong.rtk-sync"
+    )]
+    pub service_label: String,
+
+    #[arg(long, default_value_t = true)]
+    pub restart_service: bool,
 }
 
 #[derive(Debug, Parser)]

@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use clap::Parser;
 use rtk_sync::cli::{Cli, Command};
-use rtk_sync::{config, machine, rtkdb, service, state, syncer};
+use rtk_sync::{config, machine, rtkdb, service, state, syncer, update};
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -65,6 +65,9 @@ fn main() -> Result<()> {
                     .unwrap_or_else(|| "<none>".to_string())
             );
             println!("Pending events: {pending_count}");
+        }
+        Command::Update(args) => {
+            update::install_latest(args)?;
         }
         Command::RunService(args) => {
             let config = config::sync_config(rtk_sync::cli::SyncArgs {
