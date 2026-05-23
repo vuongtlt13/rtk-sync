@@ -1,8 +1,10 @@
 use crate::cli::{ServiceArgs, ServiceRemoveArgs};
 use anyhow::{bail, Context, Result};
 use std::env;
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 use std::fs;
 use std::path::{Path, PathBuf};
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 use std::process::Command;
 
 #[cfg(target_os = "linux")]
@@ -46,6 +48,7 @@ fn ensure_absolute_binary(binary: &Path) -> Result<()> {
     Ok(())
 }
 
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn service_args(binary: &Path, config: Option<&Path>) -> Vec<String> {
     let mut args = vec![binary.display().to_string(), "run-service".to_string()];
     if let Some(config) = config {
@@ -242,6 +245,7 @@ WantedBy=default.target
     )
 }
 
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn run_command(program: &str, args: &[&str], require_success: bool) -> Result<()> {
     let status = Command::new(program)
         .args(args)
