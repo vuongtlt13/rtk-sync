@@ -1,4 +1,4 @@
-use crate::cli::{ConfigArgs, InspectArgs, MachineIdArgs, ResetArgs, SyncArgs};
+use crate::cli::{ConfigArgs, InspectArgs, MachineIdArgs, ResetArgs, StatusArgs, SyncArgs};
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -24,6 +24,12 @@ pub struct InspectConfig {
 pub struct MachineConfig {
     pub state_path: PathBuf,
     pub machine_id: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct StatusConfig {
+    pub db_path: PathBuf,
+    pub state_path: PathBuf,
 }
 
 #[derive(Debug, Clone)]
@@ -74,6 +80,14 @@ pub fn machine_config(args: MachineIdArgs) -> Result<MachineConfig> {
 pub fn reset_config(args: ResetArgs) -> Result<PathBuf> {
     let file = load_config(args.config.as_deref())?;
     Ok(resolve_state_path(args.state, &file))
+}
+
+pub fn status_config(args: StatusArgs) -> Result<StatusConfig> {
+    let file = load_config(args.config.as_deref())?;
+    Ok(StatusConfig {
+        db_path: resolve_db_path(args.db, &file),
+        state_path: resolve_state_path(args.state, &file),
+    })
 }
 
 pub fn write_config(args: ConfigArgs) -> Result<PathBuf> {

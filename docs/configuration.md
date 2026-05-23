@@ -37,7 +37,16 @@ cargo run -- config \
   --token your-token
 ```
 
-This updates the OS-specific `config.toml` file.
+This updates the OS-specific `config.toml` file. To use a local development config instead, pass `--config`:
+
+```bash
+cargo run -- config --config ./config.local.toml \
+  --endpoint http://localhost:3000/api/rtk/events \
+  --token your-token \
+  --allow-insecure-http true
+
+cargo run -- once --config ./config.local.toml --dry-run
+```
 
 ## Keep token outside config.toml
 
@@ -93,20 +102,29 @@ DB path precedence:
 
 ## Environment variables
 
-See [../.env.example](../.env.example). `rtk-sync` auto-loads a local `.env` file without overriding variables already set in the process environment.
+`rtk-sync` reads real process environment variables, but does not auto-load `.env` files. For local development, pass `--config <path>` to use a repository-local config file instead of the installed default.
+
+Example:
+
+```bash
+cargo run -- once --config ./config.local.toml --dry-run
+rtk-sync once --config ./config.local.toml --dry-run
+```
+
+See [../.env.example](../.env.example) for shell env examples.
 
 Supported variables:
 
 ```bash
-RTK_SYNC_CONFIG      # config.toml path override
-RTK_SYNC_DB          # RTK SQLite DB path override
-RTK_DB_PATH          # RTK-compatible DB path override
+RTK_SYNC_CONFIG               # config.toml path override
+RTK_SYNC_DB                   # RTK SQLite DB path override
+RTK_DB_PATH                   # RTK-compatible DB path override
 RTK_SYNC_ENDPOINT             # upload endpoint override
 RTK_SYNC_TOKEN                # default bearer token env var
 RTK_SYNC_MACHINE_ID           # machine ID override
 RTK_SYNC_BATCH_SIZE           # batch size override
 RTK_SYNC_ALLOW_INSECURE_HTTP  # allow http:// endpoints for local development
-RTK_SYNC_STATE       # state file path override
+RTK_SYNC_STATE                # state file path override
 ```
 
 ## State file

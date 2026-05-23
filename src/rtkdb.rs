@@ -74,6 +74,20 @@ pub fn inspect(db_path: &Path) -> Result<()> {
     Ok(())
 }
 
+pub fn latest_command_id(conn: &Connection) -> Result<Option<i64>> {
+    conn.query_row("SELECT MAX(id) FROM commands", [], |row| row.get(0))
+        .context("failed to read latest command id")
+}
+
+pub fn pending_count(conn: &Connection, after_id: i64) -> Result<i64> {
+    conn.query_row(
+        "SELECT COUNT(*) FROM commands WHERE id > ?1",
+        params![after_id],
+        |row| row.get(0),
+    )
+    .context("failed to count pending commands")
+}
+
 pub fn fetch_events(
     conn: &Connection,
     after_id: i64,

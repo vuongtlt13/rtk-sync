@@ -10,14 +10,23 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
+    /// Inspect the RTK SQLite database schema and diagnostics.
     Inspect(InspectArgs),
+    /// Print or initialize the stable local machine ID.
     MachineId(MachineIdArgs),
+    /// Update rtk-sync config.toml values.
     Config(ConfigArgs),
+    /// Remove the rtk-sync state file and reset the checkpoint.
     Reset(ResetArgs),
+    /// Sync one batch of events and exit.
     Once(SyncArgs),
+    /// Show config, state, checkpoint, and pending event count.
+    Status(StatusArgs),
     #[command(hide = true)]
     RunService(ServiceRunArgs),
+    /// Install the background sync service.
     InstallService(ServiceArgs),
+    /// Uninstall the background sync service.
     UninstallService(ServiceRemoveArgs),
 }
 
@@ -79,6 +88,18 @@ pub struct ConfigArgs {
 pub struct ResetArgs {
     #[arg(long, env = "RTK_SYNC_CONFIG")]
     pub config: Option<PathBuf>,
+
+    #[arg(long, env = "RTK_SYNC_STATE")]
+    pub state: Option<PathBuf>,
+}
+
+#[derive(Debug, Parser)]
+pub struct StatusArgs {
+    #[arg(long, env = "RTK_SYNC_CONFIG")]
+    pub config: Option<PathBuf>,
+
+    #[arg(long, env = "RTK_SYNC_DB")]
+    pub db: Option<PathBuf>,
 
     #[arg(long, env = "RTK_SYNC_STATE")]
     pub state: Option<PathBuf>,

@@ -4,7 +4,6 @@ use rtk_sync::cli::{Cli, Command};
 use rtk_sync::{config, machine, rtkdb, service, state, syncer};
 
 fn main() -> Result<()> {
-    dotenvy::dotenv().ok();
     let cli = Cli::parse();
 
     match cli.command {
@@ -37,6 +36,35 @@ fn main() -> Result<()> {
         Command::Once(args) => {
             let config = config::sync_config(args)?;
             syncer::run_once(&config)?;
+        }
+        Command::Status(args) => {
+            let config = config::status_config(args)?;
+            let state = state::State::load(&config.state_path)?;
+            let conn = rtkdb::open_read_only(&config.db_path)?;
+            let latest_command_id = rtkdb::latest_command_id(&conn)?;
+            let pending_count = rtkdb::pending_count(&conn, state.last_synced_id)?;
+
+            println!("Config state:{}", config.state_path.display());
+            println!("RTK DB:{}", config.db_path.display());
+            println!(
+                "Machine ID:{}",
+                state.machine_id.as_deref().unwrap_or("<unset>")
+            );
+            println!("Last synced ID:{}", state.last_synced_id);
+            println!(
+                "Last synced at:{}",
+                state
+                    .last_synced_at
+                    .map(|value| value.to_rfc3339())
+                    .unwrap_or_else(|| "<never>".to_string())
+            );
+            println!(
+                "Latest RTK command ID:{}",
+                latest_command_id
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "<none>".to_string())
+            );
+            println!("Pending events: {pending_count}");
         }
         Command::RunService(args) => {
             let config = config::sync_config(rtk_sync::cli::SyncArgs {
