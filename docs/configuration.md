@@ -93,7 +93,7 @@ DB path precedence:
 
 ## Environment variables
 
-See [../.env.example](../.env.example).
+See [../.env.example](../.env.example). `rtk-sync` auto-loads a local `.env` file without overriding variables already set in the process environment.
 
 Supported variables:
 
@@ -101,10 +101,11 @@ Supported variables:
 RTK_SYNC_CONFIG      # config.toml path override
 RTK_SYNC_DB          # RTK SQLite DB path override
 RTK_DB_PATH          # RTK-compatible DB path override
-RTK_SYNC_ENDPOINT    # upload endpoint override
-RTK_SYNC_TOKEN       # default bearer token env var
-RTK_SYNC_MACHINE_ID  # machine ID override
-RTK_SYNC_BATCH_SIZE  # batch size override
+RTK_SYNC_ENDPOINT             # upload endpoint override
+RTK_SYNC_TOKEN                # default bearer token env var
+RTK_SYNC_MACHINE_ID           # machine ID override
+RTK_SYNC_BATCH_SIZE           # batch size override
+RTK_SYNC_ALLOW_INSECURE_HTTP  # allow http:// endpoints for local development
 RTK_SYNC_STATE       # state file path override
 ```
 

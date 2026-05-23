@@ -4,6 +4,7 @@ use rtk_sync::cli::{Cli, Command};
 use rtk_sync::{config, machine, rtkdb, service, state, syncer};
 
 fn main() -> Result<()> {
+    dotenvy::dotenv().ok();
     let cli = Cli::parse();
 
     match cli.command {

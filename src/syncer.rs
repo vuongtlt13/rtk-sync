@@ -9,8 +9,13 @@ use std::thread;
 use std::time::Duration;
 
 pub fn run_once(config: &SyncConfig) -> Result<()> {
-    let started_at = Utc::now();
-    println!("rtk-sync: sync started at {}", started_at.to_rfc3339());
+    log_run_start(config);
+    run_batch(config)?;
+    println!("rtk-sync: sync completed");
+    Ok(())
+}
+
+fn run_batch(config: &SyncConfig) -> Result<bool> {
     println!(
         "rtk-sync: loading state from {}",
         config.state_path.display()
@@ -44,7 +49,7 @@ pub fn run_once(config: &SyncConfig) -> Result<()> {
     let events = rtkdb::fetch_events(&conn, state.last_synced_id, config.batch_size, &machine_id)?;
     if events.is_empty() {
         println!("rtk-sync: no events to sync");
-        return Ok(());
+        return Ok(false);
     }
 
     let first_id = events
@@ -67,7 +72,7 @@ pub fn run_once(config: &SyncConfig) -> Result<()> {
                 serde_json::to_string(event).context("failed to serialize dry-run event")?;
             println!("rtk-sync: dry-run event {payload}");
         }
-        return Ok(());
+        return Ok(false);
     }
 
     println!(
@@ -78,12 +83,21 @@ pub fn run_once(config: &SyncConfig) -> Result<()> {
         last_id
     );
 
+    let previous_checkpoint = state.last_synced_id;
     let result = client::upload_events(&config.endpoint, &config.token, &machine_id, &events)
         .context("failed to upload events")?;
     println!(
         "rtk-sync: upload accepted={} duplicates={} server_max_local_id={}",
         result.accepted, result.duplicates, result.max_local_id
     );
+
+    if result.max_local_id <= previous_checkpoint {
+        anyhow::bail!(
+            "server max_local_id {} did not advance past checkpoint {}",
+            result.max_local_id,
+            previous_checkpoint
+        );
+    }
 
     state.last_synced_id = result.max_local_id;
     state.last_synced_at = Some(Utc::now());
@@ -94,8 +108,55 @@ pub fn run_once(config: &SyncConfig) -> Result<()> {
         result.max_local_id,
         config.state_path.display()
     );
-    println!("rtk-sync: sync completed");
-    Ok(())
+    Ok(events.len() == config.batch_size)
+}
+
+fn log_run_start(config: &SyncConfig) {
+    let started_at = Utc::now();
+    println!("rtk-sync: sync started at {}", started_at.to_rfc3339());
+    println!(
+        "rtk-sync: endpoint={} token={}",
+        display_endpoint(&config.endpoint),
+        mask_token(&config.token)
+    );
+}
+
+fn display_endpoint(endpoint: &str) -> &str {
+    if endpoint.is_empty() {
+        "<unset>"
+    } else {
+        endpoint
+    }
+}
+
+fn mask_token(token: &str) -> String {
+    if token.is_empty() {
+        return "<unset>".to_string();
+    }
+
+    let chars = token.chars().collect::<Vec<_>>();
+    if chars.len() <= 8 {
+        return "***".to_string();
+    }
+
+    let prefix = chars.iter().take(4).collect::<String>();
+    let suffix = chars.iter().skip(chars.len() - 4).collect::<String>();
+    format!("{prefix}***{suffix}")
+}
+
+pub fn run_service_interval(config: &SyncConfig) {
+    log_run_start(config);
+    loop {
+        match run_batch(config) {
+            Ok(true) => println!("rtk-sync: batch full; checking for more events"),
+            Ok(false) => break,
+            Err(error) => {
+                eprintln!("rtk-sync: sync failed: {error:#}");
+                break;
+            }
+        }
+    }
+    println!("rtk-sync: sync interval completed");
 }
 
 pub fn run_daemon(config: SyncConfig, interval_seconds: u64) -> Result<()> {
@@ -104,9 +165,7 @@ pub fn run_daemon(config: SyncConfig, interval_seconds: u64) -> Result<()> {
         interval_seconds
     );
     loop {
-        if let Err(error) = run_once(&config) {
-            eprintln!("rtk-sync: sync failed: {error:#}");
-        }
+        run_service_interval(&config);
         println!("rtk-sync: sleeping for {}s", interval_seconds);
         thread::sleep(Duration::from_secs(interval_seconds));
     }

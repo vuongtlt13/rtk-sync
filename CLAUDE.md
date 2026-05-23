@@ -36,7 +36,7 @@ cargo run -- once --db ~/.local/share/rtk/history.db --endpoint <https-url>
 cargo run -- daemon --interval 60
 ```
 
-Configuration examples live in [config.example.toml](config.example.toml) and [.env.example](.env.example). The binary auto-creates an OS-specific default config at `dirs::config_dir()/rtk-sync/config.toml`; env vars override config values, and CLI flags override both. It reads environment variables directly and does not currently load `.env` files itself.
+Configuration examples live in [config.example.toml](config.example.toml) and [.env.example](.env.example). The binary auto-creates an OS-specific default config at `dirs::config_dir()/rtk-sync/config.toml`; env vars override config values, and CLI flags override both. It auto-loads a local `.env` file without overriding variables already set in the process environment.
 
 ## CLI shape
 

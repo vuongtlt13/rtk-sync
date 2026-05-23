@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, OpenFlags, OptionalExtension};
 use serde::Serialize;
+use sha2::{Digest, Sha256};
 use std::path::Path;
 
 #[derive(Debug, Clone, Serialize)]
@@ -101,18 +102,40 @@ pub fn fetch_events(
                 )
             })?;
 
+            let original_cmd: String = row.get(2)?;
+            let command: String = row.get(3)?;
+            let input_tokens: i64 = row.get(4)?;
+            let output_tokens: i64 = row.get(5)?;
+            let saved_tokens: i64 = row.get(6)?;
+            let savings_pct: f64 = row.get(7)?;
+            let exec_time_ms: i64 = row.get(8)?;
+            let project_path: String = row.get(9)?;
+            let source_id = source_id(SourceIdParts {
+                machine_id,
+                local_id,
+                timestamp: &timestamp,
+                original_cmd: &original_cmd,
+                command: &command,
+                input_tokens,
+                output_tokens,
+                saved_tokens,
+                savings_pct,
+                exec_time_ms,
+                project_path: &project_path,
+            });
+
             Ok(RtkEvent {
-                source_id: format!("{machine_id}:{local_id}"),
+                source_id,
                 machine_id: machine_id.to_string(),
                 local_id,
-                original_cmd: row.get(2)?,
-                command: row.get(3)?,
-                input_tokens: row.get(4)?,
-                output_tokens: row.get(5)?,
-                saved_tokens: row.get(6)?,
-                savings_pct: row.get(7)?,
-                exec_time_ms: row.get(8)?,
-                project_path: row.get(9)?,
+                original_cmd,
+                command,
+                input_tokens,
+                output_tokens,
+                saved_tokens,
+                savings_pct,
+                exec_time_ms,
+                project_path,
                 created_at,
             })
         })
@@ -120,6 +143,44 @@ pub fn fetch_events(
 
     rows.collect::<std::result::Result<Vec<_>, _>>()
         .context("failed to map commands")
+}
+
+struct SourceIdParts<'a> {
+    machine_id: &'a str,
+    local_id: i64,
+    timestamp: &'a str,
+    original_cmd: &'a str,
+    command: &'a str,
+    input_tokens: i64,
+    output_tokens: i64,
+    saved_tokens: i64,
+    savings_pct: f64,
+    exec_time_ms: i64,
+    project_path: &'a str,
+}
+
+fn source_id(parts: SourceIdParts<'_>) -> String {
+    let mut hasher = Sha256::new();
+    hash_part(&mut hasher, parts.machine_id);
+    hash_part(&mut hasher, &parts.local_id.to_string());
+    hash_part(&mut hasher, parts.timestamp);
+    hash_part(&mut hasher, parts.original_cmd);
+    hash_part(&mut hasher, parts.command);
+    hash_part(&mut hasher, &parts.input_tokens.to_string());
+    hash_part(&mut hasher, &parts.output_tokens.to_string());
+    hash_part(&mut hasher, &parts.saved_tokens.to_string());
+    hash_part(&mut hasher, &parts.savings_pct.to_string());
+    hash_part(&mut hasher, &parts.exec_time_ms.to_string());
+    hash_part(&mut hasher, parts.project_path);
+
+    let digest = hasher.finalize();
+    format!("{}:{digest:x}", parts.machine_id)
+}
+
+fn hash_part(hasher: &mut Sha256, value: &str) {
+    hasher.update(value.len().to_string().as_bytes());
+    hasher.update(b":");
+    hasher.update(value.as_bytes());
 }
 
 fn parse_timestamp(timestamp: &str) -> std::result::Result<DateTime<Utc>, chrono::ParseError> {
@@ -179,7 +240,10 @@ mod tests {
         let events = fetch_events(&conn, 0, 100, "machine-1").expect("fetch events");
 
         assert_eq!(events.len(), 1);
-        assert_eq!(events[0].source_id, "machine-1:7");
+        assert_eq!(
+            events[0].source_id,
+            "machine-1:8a9ab86c464f0dd11965d22b835e74f22f29bbed363576ce9f8161d7adb2f5a6"
+        );
         assert_eq!(events[0].command, "rtk git status");
         assert_eq!(events[0].original_cmd, "git status");
         assert_eq!(events[0].saved_tokens, 75);

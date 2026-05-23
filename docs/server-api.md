@@ -17,7 +17,7 @@ Request body shape:
   "machine_id": "macbook-vuong-a1b2c3d4",
   "events": [
     {
-      "source_id": "macbook-vuong-a1b2c3d4:12345",
+      "source_id": "macbook-vuong-a1b2c3d4:8a9ab86c464f0dd11965d22b835e74f22f29bbed363576ce9f8161d7adb2f5a6",
       "machine_id": "macbook-vuong-a1b2c3d4",
       "local_id": 12345,
       "command": "rtk git status",
@@ -55,7 +55,7 @@ The server should enforce uniqueness on `source_id`.
 `source_id` is generated as:
 
 ```text
-<machine_id>:<local_row_id>
+<machine_id>:<sha256(machine_id + local_id + row_content)>
 ```
 
-This makes retries safe when an upload succeeds on the server but the client fails before recording the checkpoint.
+The row content includes timestamp, original command, RTK command, token counts, savings percentage, execution time, and project path. This makes retries safe when an upload succeeds on the server but the client fails before recording the checkpoint, while tying the idempotency key to the uploaded row content.

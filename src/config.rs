@@ -11,6 +11,7 @@ const RTK_SYNC_DATA_DIR: &str = "rtk-sync";
 const RTK_SYNC_STATE: &str = "state.json";
 const RTK_SYNC_CONFIG: &str = "config.toml";
 const DEFAULT_TOKEN_ENV: &str = "RTK_SYNC_TOKEN";
+const ALLOW_INSECURE_HTTP_ENV: &str = "RTK_SYNC_ALLOW_INSECURE_HTTP";
 const DEFAULT_BATCH_SIZE: usize = 100;
 const DEFAULT_INTERVAL_SECONDS: u64 = 60;
 
@@ -147,7 +148,9 @@ pub fn sync_config(args: SyncArgs) -> Result<SyncConfig> {
         .or(file.batch_size)
         .unwrap_or(DEFAULT_BATCH_SIZE);
     let interval = file.interval.unwrap_or(DEFAULT_INTERVAL_SECONDS);
-    let allow_insecure_http = args.allow_insecure_http || file.allow_insecure_http.unwrap_or(false);
+    let allow_insecure_http = args.allow_insecure_http
+        || env_bool(ALLOW_INSECURE_HTTP_ENV)?.unwrap_or(false)
+        || file.allow_insecure_http.unwrap_or(false);
 
     if batch_size == 0 {
         bail!("batch size must be greater than zero");
@@ -156,7 +159,17 @@ pub fn sync_config(args: SyncArgs) -> Result<SyncConfig> {
         bail!("interval must be greater than zero");
     }
     let (endpoint, token) = if args.dry_run {
-        (endpoint.unwrap_or_default(), String::new())
+        let endpoint = endpoint.unwrap_or_default();
+        if !endpoint.is_empty() {
+            validate_endpoint(&endpoint, allow_insecure_http)?;
+        }
+        (
+            endpoint,
+            env::var(&token_env)
+                .ok()
+                .or(file.token.clone())
+                .unwrap_or_default(),
+        )
     } else {
         let endpoint = endpoint.context(
             "endpoint is required; set --endpoint, RTK_SYNC_ENDPOINT, or endpoint in config.toml",
@@ -190,6 +203,18 @@ fn first_string(
     config_value: Option<String>,
 ) -> Option<String> {
     cli_value.or(env_value).or(config_value)
+}
+
+fn env_bool(name: &str) -> Result<Option<bool>> {
+    let Ok(value) = env::var(name) else {
+        return Ok(None);
+    };
+
+    match value.trim().to_ascii_lowercase().as_str() {
+        "1" | "true" | "yes" | "on" => Ok(Some(true)),
+        "0" | "false" | "no" | "off" => Ok(Some(false)),
+        _ => bail!("{name} must be a boolean: true/false, yes/no, on/off, or 1/0"),
+    }
 }
 
 fn load_config(cli_path: Option<&Path>) -> Result<FileConfig> {

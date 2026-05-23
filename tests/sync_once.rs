@@ -45,8 +45,9 @@ fn once_uploads_events_and_advances_checkpoint() {
 
     assert_eq!(state.last_synced_id, 2);
     assert!(request.contains("Authorization: Bearer test-token"));
-    assert!(request.contains("\"source_id\":\"machine-1:1\""));
-    assert!(request.contains("\"source_id\":\"machine-1:2\""));
+    assert!(request.contains("\"source_id\":\"machine-1:"));
+    assert!(!request.contains("\"source_id\":\"machine-1:1\""));
+    assert!(!request.contains("\"source_id\":\"machine-1:2\""));
 }
 
 #[test]
@@ -75,6 +76,44 @@ fn failed_upload_does_not_advance_checkpoint() {
     let state = State::load(&state_path).expect("load state");
 
     assert_eq!(state.last_synced_id, 0);
+}
+
+#[test]
+fn service_interval_uploads_all_backlog_in_batches() {
+    let _guard = test_lock();
+    let dir = tempfile::tempdir().expect("create tempdir");
+    let db_path = dir.path().join("history.db");
+    let state_path = dir.path().join("state.json");
+    create_db(&db_path);
+    insert_command(&db_path, 1);
+    insert_command(&db_path, 2);
+    insert_command(&db_path, 3);
+
+    let server = TestServer::start_sequence(vec![
+        (200, r#"{"accepted":2,"duplicates":0,"max_local_id":2}"#),
+        (200, r#"{"accepted":1,"duplicates":0,"max_local_id":3}"#),
+    ]);
+    let config = SyncConfig {
+        db_path,
+        state_path: state_path.clone(),
+        endpoint: server.endpoint(),
+        token_env: "RTK_SYNC_TOKEN".to_string(),
+        token: "test-token".to_string(),
+        machine_id: Some("machine-1".to_string()),
+        batch_size: 2,
+        interval: 60,
+        dry_run: false,
+    };
+
+    syncer::run_service_interval(&config);
+    let state = State::load(&state_path).expect("load state");
+    let first_request = server.request_rx.recv().expect("receive first request");
+    let second_request = server.request_rx.recv().expect("receive second request");
+
+    assert_eq!(state.last_synced_id, 3);
+    assert!(first_request.contains("\"local_id\":1"));
+    assert!(first_request.contains("\"local_id\":2"));
+    assert!(second_request.contains("\"local_id\":3"));
 }
 
 #[test]
@@ -141,54 +180,27 @@ struct TestServer {
 
 impl TestServer {
     fn start(status: u16, body: &'static str) -> Self {
+        Self::start_sequence(vec![(status, body)])
+    }
+
+    fn start_sequence(responses: Vec<(u16, &'static str)>) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind server");
         let addr = listener.local_addr().expect("read local addr");
         let (request_tx, request_rx) = mpsc::channel();
 
         thread::spawn(move || {
-            let (mut stream, _) = listener.accept().expect("accept connection");
-            let mut request = Vec::new();
-            let mut buffer = [0; 1024];
-            loop {
-                let size = stream.read(&mut buffer).expect("read request");
-                if size == 0 {
-                    break;
-                }
-                request.extend_from_slice(&buffer[..size]);
-                if request.windows(4).any(|window| window == b"\r\n\r\n") {
-                    break;
-                }
+            for (status, body) in responses {
+                let (mut stream, _) = listener.accept().expect("accept connection");
+                let request = read_request(&mut stream);
+                request_tx.send(request).expect("send request");
+                let response = format!(
+                    "HTTP/1.1 {status} OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+                stream
+                    .write_all(response.as_bytes())
+                    .expect("write response");
             }
-            let header_end = request
-                .windows(4)
-                .position(|window| window == b"\r\n\r\n")
-                .map(|index| index + 4)
-                .unwrap_or(request.len());
-            let headers = String::from_utf8_lossy(&request[..header_end]);
-            let content_length = headers
-                .lines()
-                .find_map(|line| {
-                    let (name, value) = line.split_once(':')?;
-                    name.eq_ignore_ascii_case("content-length")
-                        .then(|| value.trim().parse::<usize>().ok())?
-                })
-                .unwrap_or(0);
-            while request.len() < header_end + content_length {
-                let size = stream.read(&mut buffer).expect("read request body");
-                if size == 0 {
-                    break;
-                }
-                request.extend_from_slice(&buffer[..size]);
-            }
-            let request = String::from_utf8_lossy(&request).to_string();
-            request_tx.send(request).expect("send request");
-            let response = format!(
-                "HTTP/1.1 {status} OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
-                body.len()
-            );
-            stream
-                .write_all(response.as_bytes())
-                .expect("write response");
         });
 
         Self { addr, request_rx }
@@ -197,4 +209,41 @@ impl TestServer {
     fn endpoint(&self) -> String {
         format!("http://{}/api/rtk/events", self.addr)
     }
+}
+
+fn read_request(stream: &mut std::net::TcpStream) -> String {
+    let mut request = Vec::new();
+    let mut buffer = [0; 1024];
+    loop {
+        let size = stream.read(&mut buffer).expect("read request");
+        if size == 0 {
+            break;
+        }
+        request.extend_from_slice(&buffer[..size]);
+        if request.windows(4).any(|window| window == b"\r\n\r\n") {
+            break;
+        }
+    }
+    let header_end = request
+        .windows(4)
+        .position(|window| window == b"\r\n\r\n")
+        .map(|index| index + 4)
+        .unwrap_or(request.len());
+    let headers = String::from_utf8_lossy(&request[..header_end]);
+    let content_length = headers
+        .lines()
+        .find_map(|line| {
+            let (name, value) = line.split_once(':')?;
+            name.eq_ignore_ascii_case("content-length")
+                .then(|| value.trim().parse::<usize>().ok())?
+        })
+        .unwrap_or(0);
+    while request.len() < header_end + content_length {
+        let size = stream.read(&mut buffer).expect("read request body");
+        if size == 0 {
+            break;
+        }
+        request.extend_from_slice(&buffer[..size]);
+    }
+    String::from_utf8_lossy(&request).to_string()
 }
