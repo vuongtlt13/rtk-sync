@@ -35,9 +35,9 @@ rtk-sync --version
 ### Linux x86_64
 
 ```bash
-curl -L -o rtk-sync-x86_64-unknown-linux-gnu.tar.gz \
-  https://github.com/<owner>/<repo>/releases/latest/download/rtk-sync-x86_64-unknown-linux-gnu.tar.gz
-tar -xzf rtk-sync-x86_64-unknown-linux-gnu.tar.gz
+curl -L -o rtk-sync-x86_64-unknown-linux-musl.tar.gz \
+  https://github.com/<owner>/<repo>/releases/latest/download/rtk-sync-x86_64-unknown-linux-musl.tar.gz
+tar -xzf rtk-sync-x86_64-unknown-linux-musl.tar.gz
 chmod +x rtk-sync
 sudo mv rtk-sync /usr/local/bin/rtk-sync
 rtk-sync --version
