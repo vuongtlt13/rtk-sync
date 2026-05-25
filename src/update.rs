@@ -26,8 +26,9 @@ pub fn install_latest(args: UpdateArgs) -> Result<()> {
 fn install_latest_inner(args: &UpdateArgs, url: &str, archive: &str, tmp_dir: &Path) -> Result<()> {
     let archive_path = tmp_dir.join(archive);
     let binary_path = tmp_dir.join(BIN_NAME);
-    let install_path = args.install_dir.join(BIN_NAME);
-    let new_install_path = args.install_dir.join(format!("{BIN_NAME}.new"));
+    let install_dir = install_dir(args)?;
+    let install_path = install_dir.join(BIN_NAME);
+    let new_install_path = install_dir.join(format!("{BIN_NAME}.new"));
     let plist_path = launchd_plist_path(&args.service_label);
 
     let service_was_running = stop_service_if_running(&args.service_label, &plist_path)?;
@@ -51,10 +52,10 @@ fn install_latest_inner(args: &UpdateArgs, url: &str, archive: &str, tmp_dir: &P
         bail!("release archive did not contain {BIN_NAME}");
     }
 
-    fs::create_dir_all(&args.install_dir).with_context(|| {
+    fs::create_dir_all(&install_dir).with_context(|| {
         format!(
             "failed to create install directory:{}",
-            args.install_dir.display()
+            install_dir.display()
         )
     })?;
 
@@ -97,6 +98,20 @@ fn validate_repo(repo: &str) -> Result<()> {
         bail!("invalid GitHub repo: {repo}");
     }
     Ok(())
+}
+
+pub fn install_dir(args: &UpdateArgs) -> Result<PathBuf> {
+    if let Some(path) = &args.install_dir {
+        return Ok(path.clone());
+    }
+
+    match env::consts::OS {
+        "macos" => Ok(PathBuf::from("/opt/homebrew/bin")),
+        "linux" => dirs::home_dir()
+            .map(|home| home.join(".local/bin"))
+            .context("failed to resolve home directory for default install dir"),
+        os => bail!("unsupported platform: {os}"),
+    }
 }
 
 fn release_target() -> Result<&'static str> {

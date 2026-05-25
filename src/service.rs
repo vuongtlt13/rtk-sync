@@ -31,6 +31,17 @@ pub fn uninstall(_args: ServiceRemoveArgs) -> Result<()> {
     }
 }
 
+pub fn print_status() {
+    println!();
+    println!("Service");
+    println!("-------");
+    match env::consts::OS {
+        "macos" => print_launchd_status(),
+        "linux" => print_systemd_status(),
+        os => println!("Service: unsupported on {os}"),
+    }
+}
+
 fn resolve_binary(cli_binary: Option<PathBuf>) -> Result<PathBuf> {
     if let Some(binary) = cli_binary {
         return Ok(binary);
@@ -243,6 +254,117 @@ RestartSec=10
 WantedBy=default.target
 "#
     )
+}
+
+#[cfg(target_os = "linux")]
+fn print_systemd_status() {
+    let service_path = systemd_service_path().ok();
+    let installed = service_path.as_ref().is_some_and(|path| path.exists());
+    println!("Installed:{}", yes_no(installed));
+    if let Some(path) = service_path {
+        println!("Unit file:{}", path.display());
+    }
+    println!(
+        "Version:{}",
+        service_binary_version().unwrap_or_else(|| "<unknown>".to_string())
+    );
+    println!(
+        "State:{}",
+        command_output("systemctl", &["--user", "is-active", SERVICE_NAME])
+            .unwrap_or_else(|| "unknown".to_string())
+    );
+    println!(
+        "Enabled:{}",
+        command_output("systemctl", &["--user", "is-enabled", SERVICE_NAME])
+            .unwrap_or_else(|| "unknown".to_string())
+    );
+    println!("Recent logs:");
+    print_indented_lines(
+        &command_output(
+            "journalctl",
+            &["--user", "-u", SERVICE_NAME, "-n", "10", "--no-pager"],
+        )
+        .unwrap_or_else(|| "<no logs available>".to_string()),
+    );
+}
+
+#[cfg(not(target_os = "linux"))]
+fn print_systemd_status() {
+    println!("Service: systemd is not supported on this platform");
+}
+
+#[cfg(target_os = "macos")]
+fn print_launchd_status() {
+    let plist_path = launchd_plist_path().ok();
+    let installed = plist_path.as_ref().is_some_and(|path| path.exists());
+    println!("Installed:{}", yes_no(installed));
+    if let Some(path) = plist_path {
+        println!("Plist:{}", path.display());
+    }
+    println!(
+        "Version:{}",
+        service_binary_version().unwrap_or_else(|| "<unknown>".to_string())
+    );
+    let running = command_success(
+        "launchctl",
+        &["print", &format!("gui/{}/{}", current_uid(), MACOS_LABEL)],
+    )
+    .unwrap_or(false);
+    println!("State:{}", if running { "running" } else { "stopped" });
+    println!("Recent stdout logs:");
+    print_indented_lines(&tail_file("/tmp/rtk-sync.out.log", 10));
+    println!("Recent stderr logs:");
+    print_indented_lines(&tail_file("/tmp/rtk-sync.err.log", 10));
+}
+
+#[cfg(not(target_os = "macos"))]
+fn print_launchd_status() {
+    println!("Service: launchd is not supported on this platform");
+}
+
+fn yes_no(value: bool) -> &'static str {
+    if value {
+        "yes"
+    } else {
+        "no"
+    }
+}
+
+fn service_binary_version() -> Option<String> {
+    env::current_exe()
+        .ok()
+        .and_then(|path| command_output(&path.display().to_string(), &["--version"]))
+}
+
+fn command_output(program: &str, args: &[&str]) -> Option<String> {
+    let output = Command::new(program).args(args).output().ok()?;
+    let text = if output.stdout.is_empty() {
+        String::from_utf8_lossy(&output.stderr).trim().to_string()
+    } else {
+        String::from_utf8_lossy(&output.stdout).trim().to_string()
+    };
+    (!text.is_empty()).then_some(text)
+}
+
+fn print_indented_lines(text: &str) {
+    for line in text.lines().take(10) {
+        println!("  {line}");
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn current_uid() -> String {
+    user_id().unwrap_or_else(|_| "unknown".to_string())
+}
+
+#[cfg(target_os = "macos")]
+fn tail_file(path: &str, lines: usize) -> String {
+    std::fs::read_to_string(path)
+        .map(|content| {
+            let lines = content.lines().rev().take(lines).collect::<Vec<_>>();
+            lines.into_iter().rev().collect::<Vec<_>>().join("\n")
+        })
+        .unwrap_or_else(|_| "<no logs available>".to_string())
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]

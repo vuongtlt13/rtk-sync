@@ -133,6 +133,16 @@ rtk-sync: checkpoint updated to 148
 rtk-sync: sync completed
 ```
 
+## `status`
+
+Show config state, checkpoint, pending events, service installation/running state, installed binary version, and the last 10 service log lines.
+
+```bash
+rtk-sync status
+```
+
+On Linux, service details come from `systemctl --user` and `journalctl --user -u rtk-sync -n 10 --no-pager`.
+
 ## `install-service`
 
 Install a user-level auto-start service for background sync.

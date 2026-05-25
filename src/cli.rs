@@ -142,12 +142,8 @@ pub struct UpdateArgs {
     #[arg(long, env = "RTK_SYNC_REPO", default_value = "vuongtlt13/rtk-sync")]
     pub repo: String,
 
-    #[arg(
-        long,
-        env = "RTK_SYNC_INSTALL_DIR",
-        default_value = "/opt/homebrew/bin"
-    )]
-    pub install_dir: PathBuf,
+    #[arg(long, env = "RTK_SYNC_INSTALL_DIR")]
+    pub install_dir: Option<PathBuf>,
 
     #[arg(
         long,

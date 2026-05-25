@@ -65,6 +65,7 @@ fn main() -> Result<()> {
                     .unwrap_or_else(|| "<none>".to_string())
             );
             println!("Pending events: {pending_count}");
+            service::print_status();
         }
         Command::Update(args) => {
             update::install_latest(args)?;
