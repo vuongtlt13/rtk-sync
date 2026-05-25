@@ -2,7 +2,6 @@
 set -euo pipefail
 
 REPO="${RTK_SYNC_REPO:-vuongtlt13/rtk-sync}"
-INSTALL_DIR="${RTK_SYNC_INSTALL_DIR:-/opt/homebrew/bin}"
 BIN_NAME="rtk-sync"
 SERVICE_LABEL="${RTK_SYNC_SERVICE_LABEL:-com.vuong.rtk-sync}"
 PLIST_PATH="${RTK_SYNC_PLIST_PATH:-$HOME/Library/LaunchAgents/$SERVICE_LABEL.plist}"
@@ -10,6 +9,7 @@ RESTART_SERVICE="${RTK_SYNC_RESTART_SERVICE:-1}"
 
 case "$(uname -s)" in
   Darwin)
+    install_dir_default="/opt/homebrew/bin"
     case "$(uname -m)" in
       arm64) target="aarch64-apple-darwin" ;;
       x86_64) target="x86_64-apple-darwin" ;;
@@ -18,6 +18,7 @@ case "$(uname -s)" in
     archive="rtk-sync-$target.tar.gz"
     ;;
   Linux)
+    install_dir_default="$HOME/.local/bin"
     case "$(uname -m)" in
       x86_64) target="x86_64-unknown-linux-gnu" ;;
       *) echo "Unsupported Linux architecture: $(uname -m)" >&2; exit 1 ;;
@@ -29,6 +30,8 @@ case "$(uname -s)" in
     exit 1
     ;;
 esac
+
+INSTALL_DIR="${RTK_SYNC_INSTALL_DIR:-$install_dir_default}"
 
 url="https://github.com/$REPO/releases/latest/download/$archive"
 tmp_dir="$(mktemp -d)"

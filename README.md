@@ -22,14 +22,19 @@ Current MVP features:
 
 ## 2. Quick Start
 
-Download the right binary for your OS from GitHub Releases:
+Install the latest release online:
 
-- macOS Apple Silicon: `rtk-sync-aarch64-apple-darwin.tar.gz`
-- macOS Intel: `rtk-sync-x86_64-apple-darwin.tar.gz`
-- Linux x86_64: `rtk-sync-x86_64-unknown-linux-gnu.tar.gz`
-- Windows x86_64: `rtk-sync-x86_64-pc-windows-msvc.zip`
+```bash
+curl -fsSL https://raw.githubusercontent.com/vuongtlt13/rtk-sync/master/scripts/install.sh | bash
+```
 
-Install it somewhere on your `PATH`, then verify:
+Or install to a custom directory:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/vuongtlt13/rtk-sync/master/scripts/install.sh | bash -s -- --install-dir ~/.local/bin
+```
+
+Then verify:
 
 ```bash
 rtk-sync --version
