@@ -4,6 +4,7 @@ use std::env;
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 use std::fs;
 use std::path::{Path, PathBuf};
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 use std::process::Command;
 
 #[cfg(target_os = "linux")]
@@ -307,8 +308,7 @@ fn print_launchd_status() {
     let running = command_success(
         "launchctl",
         &["print", &format!("gui/{}/{}", current_uid(), MACOS_LABEL)],
-    )
-    .unwrap_or(false);
+    );
     println!("State:{}", if running { "running" } else { "stopped" });
     println!("Recent stdout logs:");
     print_indented_lines(&tail_file("/tmp/rtk-sync.out.log", 10));
