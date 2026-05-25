@@ -321,6 +321,7 @@ fn print_launchd_status() {
     println!("Service: launchd is not supported on this platform");
 }
 
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn yes_no(value: bool) -> &'static str {
     if value {
         "yes"
@@ -329,12 +330,14 @@ fn yes_no(value: bool) -> &'static str {
     }
 }
 
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn service_binary_version() -> Option<String> {
     env::current_exe()
         .ok()
         .and_then(|path| command_output(&path.display().to_string(), &["--version"]))
 }
 
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn command_output(program: &str, args: &[&str]) -> Option<String> {
     let output = Command::new(program).args(args).output().ok()?;
     let text = if output.stdout.is_empty() {
@@ -345,6 +348,7 @@ fn command_output(program: &str, args: &[&str]) -> Option<String> {
     (!text.is_empty()).then_some(text)
 }
 
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn print_indented_lines(text: &str) {
     for line in text.lines().take(10) {
         println!("  {line}");
@@ -353,7 +357,15 @@ fn print_indented_lines(text: &str) {
 
 #[cfg(target_os = "macos")]
 fn current_uid() -> String {
-    user_id().unwrap_or_else(|_| "unknown".to_string())
+    command_output("id", &["-u"]).unwrap_or_else(|| "unknown".to_string())
+}
+
+#[cfg(target_os = "macos")]
+fn command_success(program: &str, args: &[&str]) -> bool {
+    Command::new(program)
+        .args(args)
+        .status()
+        .is_ok_and(|status| status.success())
 }
 
 #[cfg(target_os = "macos")]
