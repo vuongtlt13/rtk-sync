@@ -40,12 +40,18 @@ Then verify:
 rtk-sync --version
 ```
 
-Configure your sync server:
+Use the forked 9router Docker image for the sync server until the integration is merged upstream:
+
+```text
+vuongtlt13/9router
+```
+
+![9router dashboard](docs/images/9router_dashboard.png)
+
+Configure `rtk-sync` to use your 9router endpoint:
 
 ```bash
-rtk-sync config \
-  --endpoint https://your-server.example.com/api/rtk/events \
-  --token your-token
+rtk-sync config --endpoint https://your-domain.example/api/rtk/sync --token your_token
 ```
 
 Check the local RTK tracking database:

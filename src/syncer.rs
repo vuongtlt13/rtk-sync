@@ -1,5 +1,6 @@
+use crate::cli::SyncArgs;
 use crate::client;
-use crate::config::SyncConfig;
+use crate::config::{self, SyncConfig};
 use crate::machine;
 use crate::rtkdb;
 use crate::state::State;
@@ -159,14 +160,30 @@ pub fn run_service_interval(config: &SyncConfig) {
     println!("rtk-sync: sync interval completed");
 }
 
-pub fn run_daemon(config: SyncConfig, interval_seconds: u64) -> Result<()> {
-    println!(
-        "rtk-sync: service loop started interval={}s",
-        interval_seconds
-    );
+pub fn run_daemon(args: SyncArgs) -> Result<()> {
+    println!("rtk-sync: service loop started");
+    let mut next_interval = config::DEFAULT_INTERVAL_SECONDS;
     loop {
-        run_service_interval(&config);
-        println!("rtk-sync: sleeping for {}s", interval_seconds);
-        thread::sleep(Duration::from_secs(interval_seconds));
+        next_interval = run_daemon_iteration(&args, next_interval, run_service_interval);
+        println!("rtk-sync: sleeping for{}s", next_interval);
+        thread::sleep(Duration::from_secs(next_interval));
+    }
+}
+
+pub fn run_daemon_iteration(
+    args: &SyncArgs,
+    fallback_interval: u64,
+    run_interval: impl FnOnce(&SyncConfig),
+) -> u64 {
+    match config::sync_config(args.clone()) {
+        Ok(config) => {
+            let interval = config.interval;
+            run_interval(&config);
+            interval
+        }
+        Err(error) => {
+            eprintln!("rtk-sync: failed to reload config: {error:#}");
+            fallback_interval
+        }
     }
 }

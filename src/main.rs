@@ -70,7 +70,7 @@ fn main() -> Result<()> {
             update::install_latest(args)?;
         }
         Command::RunService(args) => {
-            let config = config::sync_config(rtk_sync::cli::SyncArgs {
+            syncer::run_daemon(rtk_sync::cli::SyncArgs {
                 config: args.config,
                 db: None,
                 state: None,
@@ -81,7 +81,6 @@ fn main() -> Result<()> {
                 allow_insecure_http: false,
                 dry_run: false,
             })?;
-            syncer::run_daemon(config.clone(), config.interval)?;
         }
         Command::InstallService(args) => {
             service::install(args)?;

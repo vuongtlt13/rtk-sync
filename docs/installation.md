@@ -83,6 +83,22 @@ sudo cp ./target/release/rtk-sync /usr/local/bin/rtk-sync
 rtk-sync --version
 ```
 
+## 9router integration
+
+Use the forked 9router Docker image until the integration is merged upstream:
+
+```text
+vuongtlt13/9router
+```
+
+![9router dashboard](images/9router_dashboard.png)
+
+Point `rtk-sync` at your 9router deployment:
+
+```bash
+rtk-sync config --endpoint https://your-domain.example/api/rtk/sync --token your_token
+```
+
 ## Install background service
 
 After configuring endpoint/token, install the user-level background service:
@@ -96,7 +112,7 @@ Supported platforms:
 - macOS: LaunchAgent at `~/Library/LaunchAgents/com.vuong.rtk-sync.plist`
 - Linux: systemd user service at `~/.config/systemd/user/rtk-sync.service`
 
-The service starts automatically on login/restart and uses `interval` from `config.toml`.
+The service starts automatically on login/restart and reloads `config.toml` at the start of each interval, so endpoint/token/interval changes apply without restarting the service.
 
 Service logs:
 

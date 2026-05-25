@@ -13,7 +13,7 @@ const RTK_SYNC_CONFIG: &str = "config.toml";
 const DEFAULT_TOKEN_ENV: &str = "RTK_SYNC_TOKEN";
 const ALLOW_INSECURE_HTTP_ENV: &str = "RTK_SYNC_ALLOW_INSECURE_HTTP";
 const DEFAULT_BATCH_SIZE: usize = 100;
-const DEFAULT_INTERVAL_SECONDS: u64 = 60;
+pub const DEFAULT_INTERVAL_SECONDS: u64 = 60;
 
 #[derive(Debug, Clone)]
 pub struct InspectConfig {

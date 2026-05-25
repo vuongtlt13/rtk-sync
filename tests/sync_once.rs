@@ -1,4 +1,5 @@
 use chrono::Utc;
+use rtk_sync::cli::SyncArgs;
 use rtk_sync::config::SyncConfig;
 use rtk_sync::state::State;
 use rtk_sync::syncer;
@@ -117,6 +118,67 @@ fn service_interval_uploads_all_backlog_in_batches() {
 }
 
 #[test]
+fn daemon_iteration_reloads_config_changes() {
+    let _guard = test_lock();
+    let dir = tempfile::tempdir().expect("create tempdir");
+    let config_path = dir.path().join("config.toml");
+    let db_path = dir.path().join("history.db");
+    let state_path = dir.path().join("state.json");
+    create_db(&db_path);
+
+    let first_server = TestServer::start(200, r#"{"accepted":0,"duplicates":0,"max_local_id":0}"#);
+    write_sync_config(
+        &config_path,
+        &db_path,
+        &state_path,
+        &first_server.endpoint(),
+        "first-token",
+        7,
+    );
+    let args = sync_args(config_path.clone());
+
+    let first_interval = syncer::run_daemon_iteration(&args, 60, |config| {
+        assert_eq!(config.endpoint, first_server.endpoint());
+        assert_eq!(config.token, "first-token");
+    });
+
+    let second_server = TestServer::start(200, r#"{"accepted":0,"duplicates":0,"max_local_id":0}"#);
+    write_sync_config(
+        &config_path,
+        &db_path,
+        &state_path,
+        &second_server.endpoint(),
+        "second-token",
+        11,
+    );
+
+    let second_interval = syncer::run_daemon_iteration(&args, first_interval, |config| {
+        assert_eq!(config.endpoint, second_server.endpoint());
+        assert_eq!(config.token, "second-token");
+    });
+
+    assert_eq!(first_interval, 7);
+    assert_eq!(second_interval, 11);
+}
+
+#[test]
+fn daemon_iteration_skips_sync_when_config_reload_fails() {
+    let _guard = test_lock();
+    let dir = tempfile::tempdir().expect("create tempdir");
+    let config_path = dir.path().join("config.toml");
+    std::fs::write(&config_path, "endpoint = [\n").expect("write invalid config");
+    let args = sync_args(config_path);
+    let mut ran = false;
+
+    let interval = syncer::run_daemon_iteration(&args, 23, |_| {
+        ran = true;
+    });
+
+    assert_eq!(interval, 23);
+    assert!(!ran);
+}
+
+#[test]
 fn dry_run_does_not_require_server_or_advance_checkpoint() {
     let _guard = test_lock();
     let dir = tempfile::tempdir().expect("create tempdir");
@@ -161,6 +223,42 @@ fn create_db(path: &Path) {
         [],
     )
     .expect("create commands table");
+}
+
+fn sync_args(config_path: std::path::PathBuf) -> SyncArgs {
+    SyncArgs {
+        config: Some(config_path),
+        db: None,
+        state: None,
+        endpoint: None,
+        token_env: None,
+        machine_id: None,
+        batch_size: None,
+        allow_insecure_http: false,
+        dry_run: false,
+    }
+}
+
+fn write_sync_config(
+    config_path: &Path,
+    db_path: &Path,
+    state_path: &Path,
+    endpoint: &str,
+    token: &str,
+    interval: u64,
+) {
+    std::fs::write(
+        config_path,
+        format!(
+            "db = '{}'\nstate = '{}'\nendpoint = '{}'\ntoken = '{}'\nmachine_id = 'machine-1'\nbatch_size = 100\ninterval ={}\nallow_insecure_http = true\n",
+            db_path.display(),
+            state_path.display(),
+            endpoint,
+            token,
+            interval
+        ),
+    )
+    .expect("write config");
 }
 
 fn insert_command(path: &Path, id: i64) {
